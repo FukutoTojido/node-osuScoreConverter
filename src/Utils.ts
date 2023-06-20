@@ -28,5 +28,6 @@ const ApplyModsToTime = (time: number, mods: string[]): number => {
     return time;
 }
 const Fixed = (val: number, decimalPlace: number): number => Math.round(val * (10 ** decimalPlace)) / (10 ** decimalPlace);
+const Pad = (value: number, padSize: number, padStart: boolean = false): string => padStart ? value.toString().padStart(padSize, " ") : value.toString().padEnd(padSize, " ")
 
-export { Clamp, Dist, Add, TranslateToZero, FlipHR, ApplyModsToTime, Fixed };
+export { Clamp, Dist, Add, TranslateToZero, FlipHR, ApplyModsToTime, Fixed, Pad };

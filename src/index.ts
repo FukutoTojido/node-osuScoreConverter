@@ -4,7 +4,7 @@ import axios from "axios";
 import fs from "fs";
 import HitObject from "./HitObjects/HitObject.js";
 import { Input, Vec2, Eval, ModMultiplier, SingleEval, CheckPointState } from "./Types.js"
-import { Fixed } from "./Utils.js"
+import { Fixed, Pad } from "./Utils.js"
 
 const modsList = [
     "NoFail",
@@ -211,11 +211,20 @@ export default class ScoreConverter {
         ScoreConverter.maxCombo = 0;
         // console.log(this.map.difficultyMultiplier, this.map.modMultiplier);
 
+        const filtered = ScoreConverter.evalList.filter(input => input.delta !== undefined)
+        const deltaSum = filtered.reduce((prev, curr) => prev + curr.delta!, 0);
+        const avg = deltaSum / filtered.length;
+
+        const deltaSquaredSum = filtered.reduce((prev, curr) => prev + ((curr.delta! - avg) ** 2), 0);
+        const UR = Fixed(Math.sqrt(deltaSquaredSum / (filtered.length - 1)) * 10, 2);
+
         const data = ScoreConverter.evalList.reduce(
             (accumulated, hitData: Eval) => {
                 if (hitData.type !== "Slider") {
                     if (hitData.eval === 0) {
                         combo = 0;
+                        accumulated.acc.V1.h0++;
+                        accumulated.acc.V2.h0++;
                         return accumulated;
                     }
 
@@ -223,7 +232,6 @@ export default class ScoreConverter {
                         hitData.eval * (1 + (Math.max(0, combo - 1) * Beatmap.difficultyMultiplier * Beatmap.modMultiplier) / 25)
                     );
 
-                    // console.log(hitData.time, hitData.eval, score);
                     combo++;
                     if (combo > ScoreConverter.maxCombo) ScoreConverter.maxCombo = combo;
 
@@ -242,14 +250,9 @@ export default class ScoreConverter {
                         accumulated.acc.V2.h50++;
                     }
 
-                    if (hitData.eval === 0) {
-                        accumulated.acc.V1.h0++;
-                        accumulated.acc.V2.h0++;
-                    }
-
                     return {
                         V1: accumulated.V1 + score,
-                        V2: accumulated.V2 + score,
+                        V1_S: accumulated.V1_S + score,
                         acc: accumulated.acc,
                         bonus: accumulated.bonus + (hitData.bonus ?? 0),
                         bonusV2: accumulated.bonusV2 + (hitData.bonusV2 ?? 0),
@@ -281,6 +284,7 @@ export default class ScoreConverter {
                         }
 
                         combo++;
+                        if (valV2 < 50) valV2 = 50;
                         if (combo > ScoreConverter.maxCombo) ScoreConverter.maxCombo = combo;
                     } else {
                         if (checkPoint.type !== "Slider End") {
@@ -323,7 +327,7 @@ export default class ScoreConverter {
 
                 return {
                     V1: accumulated.V1 + sliderScoreV1,
-                    V2: accumulated.V2 + sliderScoreV2,
+                    V1_S: accumulated.V1_S + sliderScoreV2,
                     acc: accumulated.acc,
                     bonus: accumulated.bonus,
                     bonusV2: accumulated.bonusV2,
@@ -331,7 +335,7 @@ export default class ScoreConverter {
             },
             {
                 V1: 0,
-                V2: 0,
+                V1_S: 0,
                 acc: {
                     V1: {
                         h300: 0,
@@ -357,11 +361,14 @@ export default class ScoreConverter {
         const accV2: number =
             (data.acc.V2.h300 + data.acc.V2.h100 / 3 + data.acc.V2.h50 / 6) /
             (data.acc.V2.h300 + data.acc.V2.h100 + data.acc.V2.h50 + data.acc.V2.h0);
+        const V2: number = Math.round(700000 * (data.V1_S / Beatmap.maxScore) + 300000 * accV2 ** 10)
 
         return {
             ...data,
             accV1,
-            accV2
+            accV2,
+            UR,
+            V2
         }
     }
 
@@ -372,30 +379,36 @@ export default class ScoreConverter {
 
         if (!printResult) return score;
 
-        const calcDiff = score.V1 + score.bonus - ScoreConverter.replayData.score;
-        const expectedBonus = score.bonus - calcDiff;
+        const calcDiff = (ScoreConverter.mods.includes("ScoreV2") ? score.V2 + score.bonusV2 : score.V1 + score.bonus) - ScoreConverter.replayData.score;
+        const expectedBonus = (ScoreConverter.mods.includes("ScoreV2") ? score.bonusV2 : score.bonus) - calcDiff;
 
-        console.log(`MAX_COMBO:`.padEnd(10), ScoreConverter.maxCombo, "/", Beatmap.maxCombo);
+        console.log(`MAX_COMBO:`.padEnd(15), ScoreConverter.maxCombo, "/", Beatmap.maxCombo);
         console.log(
-            `ACC_V1:`.padEnd(10),
+            `ACC_V1:`.padEnd(15),
             Fixed(score.accV1 * 100, 2),
             "[".padStart(10, " "),
-            `\x1b[34m${score.acc.V1.h300} \x1b[32m${score.acc.V1.h100} \x1b[33m${score.acc.V1.h50} \x1b[31m${score.acc.V1.h0} \x1b[0m]`
+            `\x1b[34m${Pad(score.acc.V1.h300, 5)} \x1b[32m${Pad(score.acc.V1.h100, 5)} \x1b[33m${Pad(score.acc.V1.h50, 5)} \x1b[31m${Pad(score.acc.V1.h0, 5)} \x1b[0m]`
         );
         console.log(
-            `ACC_V2:`.padEnd(10), 
-            Fixed(score.accV2 * 100, 2), 
+            `ACC_V2:`.padEnd(15),
+            Fixed(score.accV2 * 100, 2),
             "[".padStart(10, " "),
-            `\x1b[34m${score.acc.V2.h300} \x1b[32m${score.acc.V2.h100} \x1b[33m${score.acc.V2.h50} \x1b[31m${score.acc.V2.h0} \x1b[0m]`);
-        console.log(`CALC_DIFF:`.padEnd(10), calcDiff);
+            `\x1b[34m${Pad(score.acc.V2.h300, 5)} \x1b[32m${Pad(score.acc.V2.h100, 5)} \x1b[33m${Pad(score.acc.V2.h50, 5)} \x1b[31m${Pad(score.acc.V2.h0, 5)} \x1b[0m]`);
+        console.log(`UNSTABLE_RATE:`.padEnd(15), score.UR);
+        console.log(`CALC_DIFF:`.padEnd(15), calcDiff);
         console.log(``.padEnd(30, "="));
-        console.log(`SCORE_V1 (from replay):`.padEnd(50), ScoreConverter.replayData.score, "Expected Bonus:".padStart(30).padEnd(30), expectedBonus);
-        console.log(`SCORE_V1 (calculated):`.padEnd(50), score.V1 + score.bonus, "Bonus:".padStart(30).padEnd(30), score.bonus);
-        console.log(`SCORE_V1 (slider accuracy evaluated):`.padEnd(50), score.V2 + score.bonus);
-        console.log(
-            `SCORE_V2 (slider accuracy evaluated):`.padEnd(50),
-            Math.round(700000 * (score.V2 / Beatmap.maxScore) + 300000 * score.accV2 ** 10 + score.bonusV2)
-        );
+
+        if (!ScoreConverter.mods.includes("ScoreV2")) {
+            console.log(`SCORE_V1 (from replay):`.padEnd(50), ScoreConverter.replayData.score, "Expected Bonus:".padStart(30).padEnd(30), expectedBonus);
+            console.log(`SCORE_V1 (calculated):`.padEnd(50), score.V1 + score.bonus, "Bonus:".padStart(30).padEnd(30), score.bonus);
+            console.log(`SCORE_V1 (slider accuracy evaluated):`.padEnd(50), score.V1_S + score.bonus);
+            console.log(`SCORE_V2 (slider accuracy evaluated):`.padEnd(50), score.V2);
+        } else {
+            console.log(`SCORE_V1 (calculated):`.padEnd(50), score.V1 + score.bonus);
+            console.log(`SCORE_V1 (slider accuracy evaluated):`.padEnd(50), score.V1_S + score.bonus);
+            console.log(`SCORE_V2 (slider accuracy evaluated):`.padEnd(50), score.V2 + score.bonusV2, "Bonus:".padStart(30).padEnd(30), score.bonusV2);
+            console.log(`SCORE_V2 (from replay):`.padEnd(50), ScoreConverter.replayData.score, "Expected Bonus:".padStart(30).padEnd(30), expectedBonus);
+        }
 
         return score;
     }

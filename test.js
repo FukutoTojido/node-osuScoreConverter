@@ -7,4 +7,4 @@ const Test = async (path) => {
     const data = await score.calculate();
 }
 
-Test("./replays/drastic.osr");
+Test("./replays/hrmc.osr");

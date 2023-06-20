@@ -364,7 +364,7 @@ class Slider extends HitObject {
         const val: SingleEval | null = this.hitCircle.eval(inputIdx);
         if (val === null) return null;
 
-        let state = "UNTRACKING";
+        let state = "TRACKING";
         let internalInputIdx = inputIdx;
         let sliderPartIdx = 0;
 
