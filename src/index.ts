@@ -4,7 +4,7 @@ import axios from "axios";
 import fs from "fs";
 import HitObject from "./HitObjects/HitObject.js";
 import { Input, Vec2, Eval, ModMultiplier, SingleEval, CheckPointState } from "./Types.js"
-import { Fixed, Pad } from "./Utils.js"
+import { Fixed, Pad, ApplyModsToTime } from "./Utils.js"
 
 const modsList = [
     "NoFail",
@@ -211,11 +211,11 @@ export default class ScoreConverter {
         ScoreConverter.maxCombo = 0;
         // console.log(this.map.difficultyMultiplier, this.map.modMultiplier);
 
-        const filtered = ScoreConverter.evalList.filter(input => input.delta !== undefined)
-        const deltaSum = filtered.reduce((prev, curr) => prev + curr.delta!, 0);
+        const filtered = ScoreConverter.evalList.filter(input => input.delta !== undefined).map(input => ApplyModsToTime(input.delta!, ScoreConverter.mods));
+        const deltaSum = filtered.reduce((prev, curr) => prev + curr, 0);
         const avg = deltaSum / filtered.length;
 
-        const deltaSquaredSum = filtered.reduce((prev, curr) => prev + ((curr.delta! - avg) ** 2), 0);
+        const deltaSquaredSum = filtered.reduce((prev, curr) => prev + ((curr - avg) ** 2), 0);
         const UR = Fixed(Math.sqrt(deltaSquaredSum / (filtered.length - 1)) * 10, 2);
 
         const data = ScoreConverter.evalList.reduce(

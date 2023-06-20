@@ -54,7 +54,7 @@ class HitCircle extends HitObject {
         if (delta >= Beatmap.hitWindows.GREAT && delta < Beatmap.hitWindows.OK) val = 100;
         if (delta >= Beatmap.hitWindows.OK && delta < Beatmap.hitWindows.MEH) val = 50;
 
-        return { val, valV2: val, delta };
+        return { val, valV2: val, delta: currentInput.time - this.time };
     }
 
     calculateScore(val: number) {
