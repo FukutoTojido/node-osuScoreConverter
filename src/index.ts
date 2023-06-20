@@ -203,7 +203,7 @@ export default class ScoreConverter {
             currentObjIdx++;
         }
 
-        fs.writeFileSync("./test.json", JSON.stringify(ScoreConverter.evalList, null, "\t"));
+        // fs.writeFileSync("./test.json", JSON.stringify(ScoreConverter.evalList, null, "\t"));
     }
 
     private calculateScore() {
