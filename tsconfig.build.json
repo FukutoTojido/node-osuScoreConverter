@@ -1,0 +1,8 @@
+{
+    "extends": "./tsconfig.json",
+    // 👇️ this may vary depending on how you
+    // name your test files
+    "exclude": [
+      "./Test.ts",
+    ]
+  }

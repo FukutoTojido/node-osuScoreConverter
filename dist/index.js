@@ -1,0 +1,338 @@
+import { Replay } from "@minhducsun2002/node-osr-parser";
+import Beatmap from "./Beatmap.js";
+import axios from "axios";
+const modsList = [
+    "NoFail",
+    "Easy",
+    "TouchDevice",
+    "Hidden",
+    "HardRock",
+    "SuddenDeath",
+    "DoubleTime",
+    "Relax",
+    "HalfTime",
+    "Nightcore",
+    "Flashlight",
+    "Autoplay",
+    "SpunOut",
+    "Autopilot",
+    "Perfect",
+    "Key4",
+    "Key5",
+    "Key6",
+    "Key7",
+    "Key8",
+    "FadeIn",
+    "Random",
+    "Cinema",
+    "Target",
+    "Key9",
+    "KeyCoop",
+    "Key1",
+    "Key3",
+    "Key2",
+    "ScoreV2",
+    "Mirror",
+];
+const modsMultiplierList = {
+    V1: {
+        NoFail: 0.5,
+        Easy: 0.5,
+        HalfTime: 0.3,
+        HardRock: 1.06,
+        Hidden: 1.06,
+        DoubleTime: 1.12,
+        Flashlight: 1.12,
+    },
+    V2: {
+        NoFail: 1,
+        Easy: 0.5,
+        HalfTime: 0.3,
+        HardRock: 1.1,
+        Hidden: 1.06,
+        DoubleTime: 1.2,
+        Flashlight: 1.12,
+    },
+};
+const inputList = ["SMOKE", "K2", "K1", "M2", "M1"];
+export default class ScoreConverter {
+    static evalList = [];
+    static replayData;
+    static isOldVersion;
+    static cursorInputData;
+    static mods;
+    static map;
+    static maxCombo;
+    rawReplay;
+    getIsOldVersion(version) {
+        let versionString = version.toString();
+        const year = parseInt(versionString.match(/.{1,4}/g)?.[0] ?? "0");
+        const month = parseInt(versionString
+            .match(/.{1,4}/g)?.[1]
+            .match(/.{1,2}/g)?.[0]
+            ?? "0");
+        const day = parseInt(versionString
+            .match(/.{1,4}/g)?.[1]
+            .match(/.{1,2}/g)?.[1]
+            ?? "0");
+        if (year <= 2019 && month < 5 && day < 10)
+            return true;
+        return false;
+    }
+    async readReplay() {
+        const rawData = this.rawReplay;
+        const replay = new Replay(rawData);
+        const replayData = await replay.deserialize();
+        ScoreConverter.replayData = replayData;
+        ScoreConverter.isOldVersion = this.getIsOldVersion(replayData.version);
+        let timestamp = 0;
+        ScoreConverter.cursorInputData = replayData.replayData
+            .split(",")
+            .filter((data) => data !== "")
+            .map((data, idx) => {
+            const nodes = data.split("|");
+            if (nodes[0] === "-12345")
+                return {
+                    time: 0,
+                    x: 0,
+                    y: 0,
+                    inputArray: [],
+                    idx,
+                };
+            timestamp += parseFloat(nodes[0]);
+            return {
+                time: timestamp,
+                x: parseFloat(nodes[1]),
+                y: parseFloat(nodes[2]),
+                inputArray: parseInt(nodes[3])
+                    .toString(2)
+                    .padStart(5, "0")
+                    .split("")
+                    .reduce((prev, curr, idx) => (curr === "1" && idx !== 0 ? prev.concat([inputList[idx]]) : prev), []),
+                idx,
+            };
+        });
+        // fs.writeFileSync("./replay.json", JSON.stringify(ScoreConverter.cursorInputData));
+        const mapInfo = (await axios.get(`https://tryz.vercel.app/api/h/${replayData.md5map}`)).data;
+        const osuRawFile = (await axios.get(`https://tryz.vercel.app/api/b/${mapInfo.mapId}/osu`)).data;
+        const mods = replayData.mods
+            .toString(2)
+            .padStart(31, "0")
+            .split("")
+            .reduce((accumulated, current, idx) => {
+            if (current === "1")
+                accumulated.push(modsList[modsList.length - 1 - idx]);
+            return accumulated;
+        }, []);
+        ScoreConverter.mods = mods;
+        const modMultiplier = mods.reduce((prev, curr) => {
+            return {
+                V1: modsMultiplierList.V1[curr] ? prev.V1 * modsMultiplierList.V1[curr] : prev.V1,
+                V2: modsMultiplierList.V2[curr] ? prev.V2 * modsMultiplierList.V2[curr] : prev.V2,
+            };
+        }, {
+            V1: 1,
+            V2: 1,
+        });
+        ScoreConverter.map = new Beatmap(osuRawFile, mods.includes("ScoreV2") ? modMultiplier.V2 : modMultiplier.V1, mods);
+    }
+    eval() {
+        let currentObjIdx = 0;
+        let currentInputIdx = 1;
+        while (currentInputIdx < ScoreConverter.cursorInputData.length) {
+            if (currentObjIdx >= Beatmap.baseData.hitobjects.length)
+                break;
+            const currentObj = Beatmap.baseData.hitobjects[currentObjIdx];
+            const currentInput = ScoreConverter.cursorInputData[currentInputIdx];
+            if (ScoreConverter.evalList.at(-1)?.time === currentObj.time) {
+                currentObjIdx++;
+                continue;
+            }
+            const val = currentObj.eval(currentInputIdx);
+            if (val === null) {
+                currentInputIdx++;
+                continue;
+            }
+            ScoreConverter.evalList.push({
+                time: currentObj.time,
+                eval: val.val,
+                sv2Eval: val.valV2,
+                inputTime: val.val === 0 ? null : currentInput.time,
+                type: currentObj.constructor.name,
+                checkPointState: val.checkPointState,
+                bonus: val.bonus,
+                bonusV2: val.bonusV2,
+                delta: val.delta,
+            });
+            currentInputIdx++;
+            currentObjIdx++;
+        }
+        // fs.writeFileSync("./test.json", JSON.stringify(ScoreConverter.evalList, null, "\t"));
+    }
+    calculateScore() {
+        let combo = 0;
+        ScoreConverter.maxCombo = 0;
+        // console.log(this.map.difficultyMultiplier, this.map.modMultiplier);
+        const data = ScoreConverter.evalList.reduce((accumulated, hitData) => {
+            if (hitData.type !== "Slider") {
+                if (hitData.eval === 0) {
+                    combo = 0;
+                    return accumulated;
+                }
+                const score = Math.round(hitData.eval * (1 + (Math.max(0, combo - 1) * Beatmap.difficultyMultiplier * Beatmap.modMultiplier) / 25));
+                // console.log(hitData.time, hitData.eval, score);
+                combo++;
+                if (combo > ScoreConverter.maxCombo)
+                    ScoreConverter.maxCombo = combo;
+                if (hitData.eval === 300) {
+                    accumulated.acc.V1.h300++;
+                    accumulated.acc.V2.h300++;
+                }
+                if (hitData.eval === 100) {
+                    accumulated.acc.V1.h100++;
+                    accumulated.acc.V2.h100++;
+                }
+                if (hitData.eval === 50) {
+                    accumulated.acc.V1.h50++;
+                    accumulated.acc.V2.h50++;
+                }
+                if (hitData.eval === 0) {
+                    accumulated.acc.V1.h0++;
+                    accumulated.acc.V2.h0++;
+                }
+                return {
+                    V1: accumulated.V1 + score,
+                    V2: accumulated.V2 + score,
+                    acc: accumulated.acc,
+                    bonus: accumulated.bonus + (hitData.bonus ?? 0),
+                    bonusV2: accumulated.bonusV2 + (hitData.bonusV2 ?? 0),
+                };
+            }
+            let tickScore = 0, repeatScore = 0, headScore = 0, tailScore = 0;
+            let valV1 = hitData.eval;
+            let valV2 = hitData.sv2Eval;
+            hitData.checkPointState.forEach((checkPoint) => {
+                if (checkPoint.eval === 1) {
+                    switch (checkPoint.type) {
+                        case "Slider Head":
+                            headScore += 30;
+                            break;
+                        case "Slider Tick":
+                            tickScore += 10;
+                            break;
+                        case "Slider Repeat":
+                            repeatScore += 30;
+                            break;
+                        case "Slider End":
+                            tailScore += 30;
+                    }
+                    combo++;
+                    if (combo > ScoreConverter.maxCombo)
+                        ScoreConverter.maxCombo = combo;
+                }
+                else {
+                    if (checkPoint.type !== "Slider End") {
+                        combo = 0;
+                        if (valV2 > 50)
+                            valV2 = 50;
+                    }
+                    else {
+                        if (valV1 > 100)
+                            valV1 = 100;
+                        if (valV2 > 100)
+                            valV2 = 100;
+                    }
+                }
+            });
+            const sliderScoreV1 = Math.round(valV1 * (1 + (Math.max(0, combo - 1) * Beatmap.difficultyMultiplier * Beatmap.modMultiplier) / 25) +
+                headScore +
+                tickScore +
+                repeatScore +
+                tailScore);
+            const sliderScoreV2 = Math.round(valV2 * (1 + (Math.max(0, combo - 1) * Beatmap.difficultyMultiplier * Beatmap.modMultiplier) / 25) +
+                headScore +
+                tickScore +
+                repeatScore +
+                tailScore);
+            if (hitData.eval === 300) {
+                accumulated.acc.V1.h300++;
+                accumulated.acc.V2.h300++;
+            }
+            if (hitData.eval === 100) {
+                accumulated.acc.V1.h100++;
+                accumulated.acc.V2.h100++;
+            }
+            if (hitData.eval === 50) {
+                accumulated.acc.V1.h50++;
+                accumulated.acc.V2.h50++;
+            }
+            if (hitData.eval === 0) {
+                accumulated.acc.V1.h0++;
+                accumulated.acc.V2.h0++;
+            }
+            // if (valV1 !== valV2)
+            //     console.log(hitData.time, valV1, valV2)
+            return {
+                V1: accumulated.V1 + sliderScoreV1,
+                V2: accumulated.V2 + sliderScoreV2,
+                acc: accumulated.acc,
+                bonus: accumulated.bonus,
+                bonusV2: accumulated.bonusV2,
+            };
+        }, {
+            V1: 0,
+            V2: 0,
+            acc: {
+                V1: {
+                    h300: 0,
+                    h100: 0,
+                    h50: 0,
+                    h0: 0,
+                },
+                V2: {
+                    h300: 0,
+                    h100: 0,
+                    h50: 0,
+                    h0: 0,
+                },
+            },
+            bonus: 0,
+            bonusV2: 0,
+        });
+        const accV1 = (data.acc.V1.h300 + data.acc.V1.h100 / 3 + data.acc.V1.h50 / 6) /
+            (data.acc.V1.h300 + data.acc.V1.h100 + data.acc.V1.h50 + data.acc.V1.h0);
+        const accV2 = (data.acc.V2.h300 + data.acc.V2.h100 / 3 + data.acc.V2.h50 / 6) /
+            (data.acc.V2.h300 + data.acc.V2.h100 + data.acc.V2.h50 + data.acc.V2.h0);
+        return {
+            ...data,
+            accV1,
+            accV2
+        };
+    }
+    async calculate(printResult = true) {
+        await this.readReplay();
+        this.eval();
+        const score = this.calculateScore();
+        if (!printResult)
+            return score;
+        const calcDiff = score.V1 + score.bonus - ScoreConverter.replayData.score;
+        const expectedBonus = score.bonus - calcDiff;
+        console.log(`GREAT:`.padEnd(10), ScoreConverter.evalList.filter((hit) => hit.eval === 300).length);
+        console.log(`OK:`.padEnd(10), ScoreConverter.evalList.filter((hit) => hit.eval === 100).length);
+        console.log(`MEH:`.padEnd(10), ScoreConverter.evalList.filter((hit) => hit.eval === 50).length);
+        console.log(`MISS:`.padEnd(10), ScoreConverter.evalList.filter((hit) => hit.eval === 0).length);
+        console.log(`MAX_COMBO:`.padEnd(10), ScoreConverter.maxCombo, "/", Beatmap.maxCombo);
+        console.log(`ACC_V1:`.padEnd(10), (score.accV1 * 100).toFixed(2));
+        console.log(`ACC_V2:`.padEnd(10), (score.accV2 * 100).toFixed(2));
+        console.log(`CALC_DIFF:`.padEnd(10), calcDiff);
+        console.log(``.padEnd(30, "="));
+        console.log(`SCORE_V1 (from replay):`.padEnd(50), ScoreConverter.replayData.score, "Expected Bonus:".padStart(30).padEnd(30), expectedBonus);
+        console.log(`SCORE_V1 (calculated):`.padEnd(50), score.V1 + score.bonus, "Bonus:".padStart(30).padEnd(30), score.bonus);
+        console.log(`SCORE_V1 (slider accuracy evaluated):`.padEnd(50), score.V2);
+        console.log(`SCORE_V2 (slider accuracy evaluated):`.padEnd(50), Math.round(700000 * (score.V2 / Beatmap.maxScore) + 300000 * score.accV2 ** 10 + score.bonusV2));
+        return score;
+    }
+    constructor(buffer) {
+        this.rawReplay = buffer;
+    }
+}

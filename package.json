@@ -1,0 +1,19 @@
+{
+  "name": "sv1-to-sv2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@minhducsun2002/node-osr-parser": "^0.0.2",
+    "axios": "^1.2.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.3.1"
+  }
+}
