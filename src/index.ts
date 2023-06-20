@@ -383,31 +383,28 @@ export default class ScoreConverter {
         const expectedBonus = (ScoreConverter.mods.includes("ScoreV2") ? score.bonusV2 : score.bonus) - calcDiff;
 
         console.log(`MAX_COMBO:`.padEnd(15), ScoreConverter.maxCombo, "/", Beatmap.maxCombo);
-        console.log(
-            `ACC_V1:`.padEnd(15),
-            Fixed(score.accV1 * 100, 2),
-            "[".padStart(10, " "),
-            `\x1b[34m${Pad(score.acc.V1.h300, 5)} \x1b[32m${Pad(score.acc.V1.h100, 5)} \x1b[33m${Pad(score.acc.V1.h50, 5)} \x1b[31m${Pad(score.acc.V1.h0, 5)} \x1b[0m]`
-        );
-        console.log(
-            `ACC_V2:`.padEnd(15),
-            Fixed(score.accV2 * 100, 2),
-            "[".padStart(10, " "),
-            `\x1b[34m${Pad(score.acc.V2.h300, 5)} \x1b[32m${Pad(score.acc.V2.h100, 5)} \x1b[33m${Pad(score.acc.V2.h50, 5)} \x1b[31m${Pad(score.acc.V2.h0, 5)} \x1b[0m]`);
+        console.log(`ACC_V1:`.padEnd(15), Fixed(score.accV1 * 100, 2));
+        console.log(`└─────`.padEnd(15, "─"), `\x1b[34m${score.acc.V1.h300} \x1b[0m/ \x1b[32m${score.acc.V1.h100} \x1b[0m/ \x1b[33m${score.acc.V1.h50} \x1b[0m/ \x1b[31m${score.acc.V1.h0}\x1b[0m`)
+        console.log(`ACC_V2:`.padEnd(15), Fixed(score.accV2 * 100, 2));
+        console.log(`└─────`.padEnd(15, "─"), `\x1b[34m${score.acc.V2.h300} \x1b[0m/ \x1b[32m${score.acc.V2.h100} \x1b[0m/ \x1b[33m${score.acc.V2.h50} \x1b[0m/ \x1b[31m${score.acc.V2.h0}\x1b[0m`)
         console.log(`UNSTABLE_RATE:`.padEnd(15), score.UR);
         console.log(`CALC_DIFF:`.padEnd(15), calcDiff);
         console.log(``.padEnd(30, "="));
 
         if (!ScoreConverter.mods.includes("ScoreV2")) {
-            console.log(`SCORE_V1 (from replay):`.padEnd(50), ScoreConverter.replayData.score, "Expected Bonus:".padStart(30).padEnd(30), expectedBonus);
-            console.log(`SCORE_V1 (calculated):`.padEnd(50), score.V1 + score.bonus, "Bonus:".padStart(30).padEnd(30), score.bonus);
+            console.log(`SCORE_V1 (from replay):`.padEnd(50), ScoreConverter.replayData.score);
+            console.log(`SCORE_V1 (calculated):`.padEnd(50), score.V1 + score.bonus);
             console.log(`SCORE_V1 (slider accuracy evaluated):`.padEnd(50), score.V1_S + score.bonus);
             console.log(`SCORE_V2 (slider accuracy evaluated):`.padEnd(50), score.V2);
+            console.log(`SPINNER_BONUS (expected):`.padEnd(50), expectedBonus)
+            console.log(`SPINNER_BONUS (calculated):`.padEnd(50), score.bonus)
         } else {
             console.log(`SCORE_V1 (calculated):`.padEnd(50), score.V1 + score.bonus);
             console.log(`SCORE_V1 (slider accuracy evaluated):`.padEnd(50), score.V1_S + score.bonus);
-            console.log(`SCORE_V2 (slider accuracy evaluated):`.padEnd(50), score.V2 + score.bonusV2, "Bonus:".padStart(30).padEnd(30), score.bonusV2);
-            console.log(`SCORE_V2 (from replay):`.padEnd(50), ScoreConverter.replayData.score, "Expected Bonus:".padStart(30).padEnd(30), expectedBonus);
+            console.log(`SCORE_V2 (slider accuracy evaluated):`.padEnd(50), score.V2 + score.bonusV2);
+            console.log(`SCORE_V2 (from replay):`.padEnd(50), ScoreConverter.replayData.score);
+            console.log(`SPINNER_BONUS (expected):`.padEnd(50), expectedBonus)
+            console.log(`SPINNER_BONUS (calculated):`.padEnd(50), score.bonusV2)
         }
 
         return score;
