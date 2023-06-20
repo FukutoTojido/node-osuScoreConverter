@@ -397,7 +397,7 @@ export default class ScoreConverter {
         console.log(``.padEnd(30, "="));
         console.log(`SCORE_V1 (from replay):`.padEnd(50), ScoreConverter.replayData.score, "Expected Bonus:".padStart(30).padEnd(30), expectedBonus);
         console.log(`SCORE_V1 (calculated):`.padEnd(50), score.V1 + score.bonus, "Bonus:".padStart(30).padEnd(30), score.bonus);
-        console.log(`SCORE_V1 (slider accuracy evaluated):`.padEnd(50), score.V2);
+        console.log(`SCORE_V1 (slider accuracy evaluated):`.padEnd(50), score.V2 + score.bonus);
         console.log(
             `SCORE_V2 (slider accuracy evaluated):`.padEnd(50),
             Math.round(700000 * (score.V2 / Beatmap.maxScore) + 300000 * score.accV2 ** 10 + score.bonusV2)
@@ -412,7 +412,7 @@ export default class ScoreConverter {
         ScoreConverter.isOldVersion = false;
         ScoreConverter.cursorInputData = [];
         ScoreConverter.maxCombo = 0;
-        
+
         this.rawReplay = buffer;
     }
 }
