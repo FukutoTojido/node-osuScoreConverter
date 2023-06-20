@@ -80,38 +80,45 @@ interface HitWindows {
 
 class Beatmap {
     private rawMapData: string;
-    public static maxScore: number = 0;
-    public static maxCombo: number = 0;
-    public static baseData: BeatmapData = {
-        general: {},
-        editor: {},
-        metadata: {},
-        difficulty: {
-            HPDrainRate: 0,
-            CircleSize: 0,
-            OverallDifficulty: 0,
-            ApproachRate: 0,
-            SliderMultiplier: 1.4,
-            SliderTickRate: 1
-        },
-        events: {
-            breakPeriods: new Array<BreakPeriod>
-        },
-        timingpoints: [],
-        hitobjects: [],
-        version: "",
-    };;
-    public static modMultiplier: number = 1;
-    public static difficultyMultiplier: number = 0;
-    public static stackOffset: number = 0;
-    public static hitWindows: HitWindows = {
-        GREAT: 0,
-        OK: 0,
-        MEH: 0,
-    }
+    public static maxScore: number;
+    public static maxCombo: number;
+    public static baseData: BeatmapData;
+    public static modMultiplier: number;
+    public static difficultyMultiplier: number;
+    public static stackOffset: number;
+    public static hitWindows: HitWindows;
     public mods: string[];
 
     constructor(rawMapData: string, modMultiplier: number, mods: string[]) {
+        Beatmap.maxScore = 0;
+        Beatmap.maxCombo = 0;
+        Beatmap.baseData = {
+            general: {},
+            editor: {},
+            metadata: {},
+            difficulty: {
+                HPDrainRate: 0,
+                CircleSize: 0,
+                OverallDifficulty: 0,
+                ApproachRate: 0,
+                SliderMultiplier: 1.4,
+                SliderTickRate: 1
+            },
+            events: {
+                breakPeriods: new Array<BreakPeriod>
+            },
+            timingpoints: [],
+            hitobjects: [],
+            version: "",
+        };
+        Beatmap.difficultyMultiplier = 0;
+        Beatmap.stackOffset = 0;
+        Beatmap.hitWindows = {
+            GREAT: 0,
+            OK: 0,
+            MEH: 0,
+        }
+
         Beatmap.modMultiplier = modMultiplier;
 
         this.rawMapData = rawMapData;

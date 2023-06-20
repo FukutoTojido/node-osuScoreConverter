@@ -66,7 +66,7 @@ const modsMultiplierList: {
 const inputList: string[] = ["SMOKE", "K2", "K1", "M2", "M1"];
 
 export default class ScoreConverter {
-    public static evalList: Eval[] = [];
+    public static evalList: Eval[];
     public static replayData: Replay;
     public static isOldVersion: boolean;
     public static cursorInputData: Input[];
@@ -407,6 +407,12 @@ export default class ScoreConverter {
     }
 
     constructor(buffer: Buffer) {
+        ScoreConverter.evalList = [];
+        ScoreConverter.mods = [];
+        ScoreConverter.isOldVersion = false;
+        ScoreConverter.cursorInputData = [];
+        ScoreConverter.maxCombo = 0;
+        
         this.rawReplay = buffer;
     }
 }
