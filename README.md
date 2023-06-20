@@ -1,5 +1,6 @@
 # node-osuScoreConverter
 Tool to calculate ScoreV2 from replay ScoreV1 and vice versa.
+Disclaimer: This tool does not guarantee a 100% conversion. You are always welcome to contribute to this repository :) 
 
 ## Usage
 ```js
