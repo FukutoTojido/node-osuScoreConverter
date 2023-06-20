@@ -4,7 +4,7 @@ import axios from "axios";
 import fs from "fs";
 import HitObject from "./HitObjects/HitObject.js";
 import { Input, Vec2, Eval, ModMultiplier, SingleEval, CheckPointState } from "./Types.js"
-import { Dist, Clamp, Add, TranslateToZero } from "./Utils.js"
+import { Fixed } from "./Utils.js"
 
 const modsList = [
     "NoFail",
@@ -203,7 +203,7 @@ export default class ScoreConverter {
             currentObjIdx++;
         }
 
-        // fs.writeFileSync("./test.json", JSON.stringify(ScoreConverter.evalList, null, "\t"));
+        fs.writeFileSync("./test.json", JSON.stringify(ScoreConverter.evalList, null, "\t"));
     }
 
     private calculateScore() {
@@ -309,25 +309,14 @@ export default class ScoreConverter {
                     tailScore
                 );
 
-                if (hitData.eval === 300) {
-                    accumulated.acc.V1.h300++;
-                    accumulated.acc.V2.h300++;
-                }
-
-                if (hitData.eval === 100) {
-                    accumulated.acc.V1.h100++;
-                    accumulated.acc.V2.h100++;
-                }
-
-                if (hitData.eval === 50) {
-                    accumulated.acc.V1.h50++;
-                    accumulated.acc.V2.h50++;
-                }
-
-                if (hitData.eval === 0) {
-                    accumulated.acc.V1.h0++;
-                    accumulated.acc.V2.h0++;
-                }
+                if (valV1 === 300) accumulated.acc.V1.h300++;
+                if (valV2 === 300) accumulated.acc.V2.h300++;
+                if (valV1 === 100) accumulated.acc.V1.h100++;
+                if (valV2 === 100) accumulated.acc.V2.h100++;
+                if (valV1 === 50) accumulated.acc.V1.h50++;
+                if (valV2 === 50) accumulated.acc.V2.h50++;
+                if (valV1 === 0) accumulated.acc.V1.h0++;
+                if (valV2 === 0) accumulated.acc.V2.h0++;
 
                 // if (valV1 !== valV2)
                 //     console.log(hitData.time, valV1, valV2)
@@ -386,13 +375,18 @@ export default class ScoreConverter {
         const calcDiff = score.V1 + score.bonus - ScoreConverter.replayData.score;
         const expectedBonus = score.bonus - calcDiff;
 
-        console.log(`GREAT:`.padEnd(10), ScoreConverter.evalList.filter((hit) => hit.eval === 300).length);
-        console.log(`OK:`.padEnd(10), ScoreConverter.evalList.filter((hit) => hit.eval === 100).length);
-        console.log(`MEH:`.padEnd(10), ScoreConverter.evalList.filter((hit) => hit.eval === 50).length);
-        console.log(`MISS:`.padEnd(10), ScoreConverter.evalList.filter((hit) => hit.eval === 0).length);
         console.log(`MAX_COMBO:`.padEnd(10), ScoreConverter.maxCombo, "/", Beatmap.maxCombo);
-        console.log(`ACC_V1:`.padEnd(10), (score.accV1 * 100).toFixed(2));
-        console.log(`ACC_V2:`.padEnd(10), (score.accV2 * 100).toFixed(2));
+        console.log(
+            `ACC_V1:`.padEnd(10),
+            Fixed(score.accV1 * 100, 2),
+            "[".padStart(10, " "),
+            `\x1b[34m${score.acc.V1.h300} \x1b[32m${score.acc.V1.h100} \x1b[33m${score.acc.V1.h50} \x1b[31m${score.acc.V1.h0} \x1b[0m]`
+        );
+        console.log(
+            `ACC_V2:`.padEnd(10), 
+            Fixed(score.accV2 * 100, 2), 
+            "[".padStart(10, " "),
+            `\x1b[34m${score.acc.V2.h300} \x1b[32m${score.acc.V2.h100} \x1b[33m${score.acc.V2.h50} \x1b[31m${score.acc.V2.h0} \x1b[0m]`);
         console.log(`CALC_DIFF:`.padEnd(10), calcDiff);
         console.log(``.padEnd(30, "="));
         console.log(`SCORE_V1 (from replay):`.padEnd(50), ScoreConverter.replayData.score, "Expected Bonus:".padStart(30).padEnd(30), expectedBonus);
