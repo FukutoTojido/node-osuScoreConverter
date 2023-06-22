@@ -2,3 +2,4 @@ node_modules
 dist
 test.json
 test.js
+replay.json

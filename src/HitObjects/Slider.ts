@@ -1,7 +1,7 @@
 import HitObject from "./HitObject.js";
 import HitCircle from "./HitCircle.js";
 import Beatmap from "../Beatmap.js";
-import { Dist, Clamp, Add, FlipHR, Fixed } from "../Utils.js";
+import { Dist, Clamp, Add, FlipHR, Fixed, LinearEstimation } from "../Utils.js";
 import { Input, Vec2, SingleEval, Node, SliderEval, SliderEvalResult, PointList } from "../Types.js";
 import ScoreConverter from "../index.js";
 import fs from "fs"
@@ -310,10 +310,12 @@ class Slider extends HitObject {
     private getPointAtTime(time: number): Node {
         // console.log(this.time, Math.round(((time - this.time) / (this.sliderEndEvalPosition.time - this.time + 35)) * (this.actualTrackPoints.length - 1)));
         return this.realTrackPoints[
-            Math.round(((time - this.time) / (this.endTime - this.time)) * (this.realTrackPoints.length - 1))
+            Math.ceil(((time - this.time) / (this.endTime - this.time)) * (this.realTrackPoints.length - 1))
         ];
     }
 
+    // First thing first
+    // SORRY FOR USING STRING AS A TYPE IDENTIFIER D:
     private getSliderPart(): void {
         const baseTicksList: Node[] = [];
         for (let i = 0; i < this.sliderTicksCount / this.repeat; i++) {
@@ -322,9 +324,9 @@ class Slider extends HitObject {
 
         const sliderParts: SliderEval[] = [];
         const sliderEndEvalPosition: SliderEval = {
-            ...this.pointList[Math.round((1 - 35 / (this.endTime)) * this.pointList.length)],
+            ...this.realTrackPoints[Math.round(Clamp(((this.endTime - this.time - 35) / (this.endTime - this.time)), 0, 1) * this.realTrackPoints.length)],
             type: "Slider End",
-            time: this.endTime - 35,
+            time: this.endTime - 35 < this.time ? this.endTime - 15 : this.endTime - 35,
         };
 
         for (let i = 0; i < this.repeat; i++) {
@@ -397,7 +399,28 @@ class Slider extends HitObject {
             if (state === "UNTRACKING")
                 if (currentInput.inputArray.length !== 0 && Fixed((Dist(currentInput, accountedPointAtT) / radius), 5) < 1) state = "TRACKING";
 
-            if (sliderParts[sliderPartIdx] && ScoreConverter.cursorInputData[internalInputIdx + 1].time >= sliderParts[sliderPartIdx]?.time) {
+            // if (this.time === 24309)
+            //     console.log(currentInput.time, state, Dist(currentInput, accountedPointAtT) / (2.4 * radius))
+
+
+            // if (this.time === 143903)
+            //     console.log(currentInput.time, state, currentInput, accountedPointAtT, Dist(currentInput, accountedPointAtT) / (2.4 * radius));
+
+            if (sliderParts[sliderPartIdx] && ScoreConverter.cursorInputData[internalInputIdx + 1].time > sliderParts[sliderPartIdx]?.time) {
+                if (currentInput.time !== sliderParts[sliderPartIdx]?.time) {
+                    const nextInput: Input = ScoreConverter.cursorInputData[internalInputIdx + 1];
+                    const estimatedInput: Vec2 = LinearEstimation(currentInput, nextInput, (sliderParts[sliderPartIdx].time - currentInput.time) / (nextInput.time - currentInput.time));
+
+                    // Untrack slider if release keys / move out of slider follow circle
+                    if (state === "TRACKING")
+                        if (Fixed(Dist(estimatedInput, sliderParts[sliderPartIdx]) / (2.4 * radius), 5) > 1)
+                            state = "UNTRACKING";
+
+                    // Track slider if press keys AND move inside of sliderB
+                    if (state === "UNTRACKING")
+                        if (currentInput.inputArray.length !== 0 && Fixed((Dist(currentInput, sliderParts[sliderPartIdx]) / radius), 5) < 1) state = "TRACKING";
+                }
+
                 sliderPartsEval.push({
                     type: sliderParts[sliderPartIdx].type,
                     eval: state === "TRACKING" && currentInput.time <= sliderParts[sliderPartIdx].time ? 1 : 0,

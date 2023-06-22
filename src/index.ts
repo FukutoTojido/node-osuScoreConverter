@@ -74,6 +74,10 @@ export default class ScoreConverter {
     public static map: Beatmap;
     public static maxCombo: number;
     public rawReplay: Buffer;
+    private comboPortion: number = 0;
+    private maxComboPortion: number = 0;
+    private localMap: boolean = false;
+    private rawMap: string = "";
 
     private getIsOldVersion(version: number): boolean {
         let versionString: string = version.toString();
@@ -133,10 +137,12 @@ export default class ScoreConverter {
                 };
             });
 
-        // fs.writeFileSync("./replay.json", JSON.stringify(ScoreConverter.cursorInputData));
+        fs.writeFileSync("./replay.json", JSON.stringify(ScoreConverter.cursorInputData));
 
-        const mapInfo = (await axios.get(`https://tryz.vercel.app/api/h/${replayData.md5map}`)).data;
-        const osuRawFile = (await axios.get(`https://tryz.vercel.app/api/b/${mapInfo.mapId}/osu`)).data;
+        if (!this.localMap) {
+            const mapInfo = (await axios.get(`https://tryz.vercel.app/api/h/${replayData.md5map}`)).data;
+            this.rawMap = (await axios.get(`https://tryz.vercel.app/api/b/${mapInfo.mapId}/osu`)).data;
+        }
 
         const mods: string[] = replayData.mods
             .toString(2)
@@ -162,7 +168,7 @@ export default class ScoreConverter {
             }
         );
 
-        ScoreConverter.map = new Beatmap(osuRawFile, mods.includes("ScoreV2") ? modMultiplier.V2 : modMultiplier.V1, mods);
+        ScoreConverter.map = new Beatmap(this.rawMap, mods.includes("ScoreV2") ? modMultiplier.V2 : modMultiplier.V1, mods);
     }
 
     private eval() {
@@ -203,11 +209,12 @@ export default class ScoreConverter {
             currentObjIdx++;
         }
 
-        // fs.writeFileSync("./test.json", JSON.stringify(ScoreConverter.evalList, null, "\t"));
+        fs.writeFileSync("./test.json", JSON.stringify(ScoreConverter.evalList, null, "\t"));
     }
 
     private calculateScore() {
         let combo: number = 0;
+        let maxCombo: number = 0;
         ScoreConverter.maxCombo = 0;
         // console.log(this.map.difficultyMultiplier, this.map.modMultiplier);
 
@@ -221,6 +228,7 @@ export default class ScoreConverter {
         const data = ScoreConverter.evalList.reduce(
             (accumulated, hitData: Eval) => {
                 if (hitData.type !== "Slider") {
+                    maxCombo++;
                     if (hitData.eval === 0) {
                         combo = 0;
                         accumulated.acc.V1.h0++;
@@ -250,6 +258,11 @@ export default class ScoreConverter {
                         accumulated.acc.V2.h50++;
                     }
 
+                    this.comboPortion += hitData.eval * (1 + combo / 10);
+                    this.maxComboPortion += 300 * (1 + maxCombo / 10);
+
+                    // console.log({ comboPortion: this.comboPortion, max: this.maxComboPortion })
+
                     return {
                         V1: accumulated.V1 + score,
                         V1_S: accumulated.V1_S + score,
@@ -267,23 +280,40 @@ export default class ScoreConverter {
                 let valV1 = hitData.eval;
                 let valV2 = hitData.sv2Eval;
 
+                let tempMaxCombo = maxCombo;
+                hitData.checkPointState!.filter((checkPoint: CheckPointState) => checkPoint.type !== "Slider Tick").forEach((checkPoint: CheckPointState) => {
+                    tempMaxCombo++;
+                    this.maxComboPortion += 30 * (1 + tempMaxCombo / 10);
+                })
+                hitData.checkPointState!.filter((checkPoint: CheckPointState) => checkPoint.type === "Slider Tick").forEach((checkPoint: CheckPointState) => {
+                    tempMaxCombo++;
+                    this.maxComboPortion += 10 * (1 + tempMaxCombo / 10);
+                })
+
                 hitData.checkPointState!.forEach((checkPoint: CheckPointState) => {
+                    maxCombo++;
                     if (checkPoint.eval === 1) {
+                        combo++;
                         switch (checkPoint.type) {
                             case "Slider Head":
                                 headScore += 30;
+                                this.comboPortion += 30 * (1 + combo / 10);
                                 break;
                             case "Slider Tick":
                                 tickScore += 10;
+                                this.comboPortion += 10 * (1 + combo / 10);
                                 break;
                             case "Slider Repeat":
                                 repeatScore += 30;
+                                this.comboPortion += 30 * (1 + combo / 10);
                                 break;
                             case "Slider End":
                                 tailScore += 30;
+                                this.comboPortion += 30 * (1 + combo / 10);
                         }
 
-                        combo++;
+                        // console.log({ comboPortion: this.comboPortion, max: this.maxComboPortion })
+
                         if (valV2 < 50) valV2 = 50;
                         if (combo > ScoreConverter.maxCombo) ScoreConverter.maxCombo = combo;
                     } else {
@@ -321,6 +351,12 @@ export default class ScoreConverter {
                 if (valV2 === 50) accumulated.acc.V2.h50++;
                 if (valV1 === 0) accumulated.acc.V1.h0++;
                 if (valV2 === 0) accumulated.acc.V2.h0++;
+
+                this.comboPortion += valV2 * (1 + combo / 10);
+                this.maxComboPortion += 300 * (1 + maxCombo / 10);
+
+                // console.log(valV2)
+                // console.log({ comboPortion: this.comboPortion, max: this.maxComboPortion })
 
                 // if (valV1 !== valV2)
                 //     console.log(hitData.time, valV1, valV2)
@@ -362,13 +398,19 @@ export default class ScoreConverter {
             (data.acc.V2.h300 + data.acc.V2.h100 / 3 + data.acc.V2.h50 / 6) /
             (data.acc.V2.h300 + data.acc.V2.h100 + data.acc.V2.h50 + data.acc.V2.h0);
         const V2: number = Math.round(700000 * (data.V1_S / Beatmap.maxScore) + 300000 * accV2 ** 10)
+        const V2_new: number = Math.round(700000 * (this.comboPortion / this.maxComboPortion) + 300000 * (accV2 ** 10));
+
+        console.log(this.comboPortion)
+        console.log(this.maxComboPortion)
+        console.log(700000 * (this.comboPortion / this.maxComboPortion))
 
         return {
             ...data,
             accV1,
             accV2,
             UR,
-            V2
+            V2,
+            V2_new
         }
     }
 
@@ -402,6 +444,7 @@ export default class ScoreConverter {
             console.log(`SCORE_V1 (calculated):`.padEnd(50), score.V1 + score.bonus);
             console.log(`SCORE_V1 (slider accuracy evaluated):`.padEnd(50), score.V1_S + score.bonus);
             console.log(`SCORE_V2 (slider accuracy evaluated):`.padEnd(50), score.V2 + score.bonusV2);
+            console.log(`SCORE_V2 (test):`.padEnd(50), Math.round(score.V2_new * Beatmap.modMultiplier) + score.bonusV2);
             console.log(`SCORE_V2 (from replay):`.padEnd(50), ScoreConverter.replayData.score);
             console.log(`SPINNER_BONUS (expected):`.padEnd(50), expectedBonus)
             console.log(`SPINNER_BONUS (calculated):`.padEnd(50), score.bonusV2)
@@ -410,7 +453,7 @@ export default class ScoreConverter {
         return score;
     }
 
-    constructor(buffer: Buffer) {
+    constructor(buffer: Buffer, local?: boolean, content?: string) {
         ScoreConverter.evalList = [];
         ScoreConverter.mods = [];
         ScoreConverter.isOldVersion = false;
@@ -418,5 +461,10 @@ export default class ScoreConverter {
         ScoreConverter.maxCombo = 0;
 
         this.rawReplay = buffer;
+
+        if (local && content) {
+            this.localMap = true;
+            this.rawMap = content;
+        }
     }
 }

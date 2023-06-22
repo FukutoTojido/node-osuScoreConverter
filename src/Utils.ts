@@ -29,5 +29,14 @@ const ApplyModsToTime = (time: number, mods: string[]): number => {
 }
 const Fixed = (val: number, decimalPlace: number): number => Math.round(val * (10 ** decimalPlace)) / (10 ** decimalPlace);
 const Pad = (value: number, padSize: number, padStart: boolean = false): string => padStart ? value.toString().padStart(padSize, " ") : value.toString().padEnd(padSize, " ")
+const LinearEstimation = (start: Point, end: Point, t: number): Vec2 => {
+    const deltaX: number = end.x - start.x;
+    const deltaY: number = end.y - start.y;
 
-export { Clamp, Dist, Add, TranslateToZero, FlipHR, ApplyModsToTime, Fixed, Pad };
+    return {
+        x: start.x + deltaX * t,
+        y: start.y + deltaY * t
+    }
+}
+
+export { Clamp, Dist, Add, TranslateToZero, FlipHR, ApplyModsToTime, Fixed, Pad, LinearEstimation };
