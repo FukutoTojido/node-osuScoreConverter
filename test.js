@@ -8,6 +8,17 @@ const Test = async (path) => {
 }
 
 // Test("./replays/drastic.osr");
+// Test("./replays/arisa.osr");
+// Test("./replays/restart.osr");
+// Test("./replays/rainbow.osr");
+// Test("./replays/storyteller.osr");
+// Test("./replays/uma.osr");
+// Test("./replays/uma2.osr");
+
+// Fucking osu! old slider type
+// Test("./replays/KIRBYMIX.osr");
+
+// Test("./replays/UN.osr");
 Test("./replays/dt1.osr");
 
 // (async () => {

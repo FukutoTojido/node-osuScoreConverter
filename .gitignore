@@ -1,5 +1,6 @@
 node_modules
-dist
+# dist
 test.json
 test.js
 replay.json
+x.js

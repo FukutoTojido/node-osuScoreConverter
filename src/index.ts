@@ -400,9 +400,12 @@ export default class ScoreConverter {
         const V2: number = Math.round(700000 * (data.V1_S / Beatmap.maxScore) + 300000 * accV2 ** 10)
         const V2_new: number = Math.round(700000 * (this.comboPortion / this.maxComboPortion) + 300000 * (accV2 ** 10));
 
-        console.log(this.comboPortion)
-        console.log(this.maxComboPortion)
-        console.log(700000 * (this.comboPortion / this.maxComboPortion))
+        // console.log(this.comboPortion)
+        // console.log(this.maxComboPortion)
+        // console.log(700000 * (this.comboPortion / this.maxComboPortion))
+
+        console.log(`SCORE_V1 / MAX_SCORE_V1 RATIO:`.padEnd(30, " "), Fixed(data.V1 / Beatmap.maxScore * 100, 2));
+        console.log(`COMBO_P / MAX_COMBO_P RATIO:`.padEnd(30, " "), Fixed(this.comboPortion / this.maxComboPortion * 100, 2));
 
         return {
             ...data,
@@ -421,7 +424,7 @@ export default class ScoreConverter {
 
         if (!printResult) return score;
 
-        const calcDiff = (ScoreConverter.mods.includes("ScoreV2") ? score.V2 + score.bonusV2 : score.V1 + score.bonus) - ScoreConverter.replayData.score;
+        const calcDiff = (ScoreConverter.mods.includes("ScoreV2") ? score.V2_new + score.bonusV2 : score.V1 + score.bonus) - ScoreConverter.replayData.score;
         const expectedBonus = (ScoreConverter.mods.includes("ScoreV2") ? score.bonusV2 : score.bonus) - calcDiff;
 
         console.log(`MAX_COMBO:`.padEnd(15), ScoreConverter.maxCombo, "/", Beatmap.maxCombo);
@@ -437,14 +440,14 @@ export default class ScoreConverter {
             console.log(`SCORE_V1 (from replay):`.padEnd(50), ScoreConverter.replayData.score);
             console.log(`SCORE_V1 (calculated):`.padEnd(50), score.V1 + score.bonus);
             console.log(`SCORE_V1 (slider accuracy evaluated):`.padEnd(50), score.V1_S + score.bonus);
-            console.log(`SCORE_V2 (slider accuracy evaluated):`.padEnd(50), score.V2);
+            console.log(`SCORE_V2 (old method):`.padEnd(50), Math.round(score.V2 * Beatmap.modMultiplier) + score.bonusV2);
+            console.log(`SCORE_V2 (calculated):`.padEnd(50), Math.round(score.V2_new * Beatmap.modMultiplier) + score.bonusV2);
             console.log(`SPINNER_BONUS (expected):`.padEnd(50), expectedBonus)
             console.log(`SPINNER_BONUS (calculated):`.padEnd(50), score.bonus)
         } else {
             console.log(`SCORE_V1 (calculated):`.padEnd(50), score.V1 + score.bonus);
             console.log(`SCORE_V1 (slider accuracy evaluated):`.padEnd(50), score.V1_S + score.bonus);
-            console.log(`SCORE_V2 (slider accuracy evaluated):`.padEnd(50), score.V2 + score.bonusV2);
-            console.log(`SCORE_V2 (test):`.padEnd(50), Math.round(score.V2_new * Beatmap.modMultiplier) + score.bonusV2);
+            console.log(`SCORE_V2 (calculated):`.padEnd(50), Math.round(score.V2_new * Beatmap.modMultiplier) + score.bonusV2);
             console.log(`SCORE_V2 (from replay):`.padEnd(50), ScoreConverter.replayData.score);
             console.log(`SPINNER_BONUS (expected):`.padEnd(50), expectedBonus)
             console.log(`SPINNER_BONUS (calculated):`.padEnd(50), score.bonusV2)
